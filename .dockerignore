@@ -1,0 +1,16 @@
+# 依赖与构建产物由 Dockerfile 内重新生成，不进构建上下文
+**/node_modules
+**/dist
+**/__pycache__
+**/*.pyc
+**/*.pyo
+
+# 运行数据：含数据库与证书，不进镜像
+data/
+
+# 其他
+.git
+.claude
+.env
+**/.DS_Store
+*.log

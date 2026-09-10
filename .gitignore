@@ -1,0 +1,41 @@
+# ── 环境变量与密钥 ──────────────────────────────────────────
+# 含 SECRET_KEY（JWT 签名密钥）、ADMIN_PASS、真实服务器地址
+.env
+.env.local
+*.env
+
+# ── 运行数据（绝对不能提交）────────────────────────────────
+# data/ 下是真实凭据：
+#   db/singbox.db       节点 UUID / 密码 / Reality 私钥 / 订阅 token
+#   config/config.json  服务端配置，含 Reality 私钥与全部节点口令
+#   config/key.pem      自签证书私钥
+#   sub/*.json          客户端订阅，含全部节点凭据
+# 一旦提交到公开仓库，整个代理等于公开，且 GitHub 无法真正删除历史。
+data/
+
+# ── Python ─────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# ── 前端 ───────────────────────────────────────────────────
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# ── 备份与日志 ─────────────────────────────────────────────
+*.bak
+*.bak-*
+*.log
+
+# ── 编辑器与系统 ───────────────────────────────────────────
+.claude/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

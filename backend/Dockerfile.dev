@@ -1,0 +1,10 @@
+# 开发环境后端：仅 Python + uvicorn --reload，源码 volume 挂载
+FROM python:3.14-slim
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# app/ 由 docker-compose.dev.yml volume 挂载，改 .py 自动重启
+EXPOSE 8080
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]

@@ -1,0 +1,50 @@
+# 开发环境：前后端都热更新
+#   后端 uvicorn --reload（改 .py 自动重启）
+#   前端 vite HMR（改 .vue 秒刷新）
+# 访问 http://<服务器>:5173 —— vite 把 API 代理到 backend:8080
+#   启动：docker compose -f docker-compose.dev.yml up
+services:
+  sing-box:
+    image: ghcr.io/sagernet/sing-box:latest
+    container_name: sing-box
+    restart: always
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - ./data/config:/etc/sing-box:ro
+    command: ["run", "-c", "/etc/sing-box/config.json"]
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: panel-backend-dev
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend/app:/app/app          # 源码挂载 → --reload 生效
+      - ./data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker:ro
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASS=${ADMIN_PASS:-admin123}
+      - SERVER_IP=${SERVER_IP:-auto}
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: panel-frontend-dev
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src         # 源码挂载 → HMR 生效
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.js:/app/vite.config.js
+    depends_on:
+      - backend

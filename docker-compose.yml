@@ -1,0 +1,54 @@
+# 生产环境：单容器（FastAPI 托管 Vue 构建产物）
+#   启动：docker compose up -d --build
+#   访问：http://<服务器>:8080
+#
+# 关于 PROJECT_DIR（必须设置，见 .env）：
+#   面板需要在容器里执行 `docker compose pull/up` 来升级 sing-box。
+#   bind 挂载的路径由 docker 守护进程在**宿主机**上解析，而面板容器里看到的
+#   是容器内路径 —— 如果 compose 里写相对路径（./data），面板执行时会被解析成
+#   容器内路径，宿主机上不存在，于是挂载到一个空目录，sing-box 会因读不到
+#   config.json 起不来。所以这里统一用绝对路径，并把项目目录按**相同路径**
+#   挂载进面板容器，保证两侧解析一致。
+services:
+  sing-box:
+    # 可选标签：latest，或固定版本（版本号带 v 前缀，如 v1.14.0）
+    image: ghcr.io/sagernet/sing-box:${SINGBOX_TAG:-latest}
+    container_name: sing-box
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - ${PROJECT_DIR:?请在 .env 中设置 PROJECT_DIR 为项目绝对路径}/data/config:/etc/sing-box:ro
+    command: ["run", "-c", "/etc/sing-box/config.json"]
+
+  panel:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      network: host
+    container_name: panel
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ${PROJECT_DIR:?请在 .env 中设置 PROJECT_DIR 为项目绝对路径}/data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker:ro
+      # docker compose 插件：面板用它按 compose 声明重建 sing-box，
+      # 避免硬编码 docker run 参数导致容器脱离 compose 管理
+      - /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins:ro
+      # 项目目录按相同路径挂载（只读），面板据此执行 docker compose pull / up -d
+      - ${PROJECT_DIR:?请在 .env 中设置 PROJECT_DIR 为项目绝对路径}:${PROJECT_DIR:?请在 .env 中设置 PROJECT_DIR 为项目绝对路径}:ro
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASS=${ADMIN_PASS:-admin123}
+      - SERVER_IP=${SERVER_IP:-auto}
+      - PROJECT_DIR=${PROJECT_DIR:?请在 .env 中设置 PROJECT_DIR 为项目绝对路径}
+      - COMPOSE_DIR=${PROJECT_DIR:?请在 .env 中设置 PROJECT_DIR 为项目绝对路径}
+      - COMPOSE_FILE_NAME=docker-compose.yml
+      - SINGBOX_TAG=${SINGBOX_TAG:-latest}
+      # 配置目录在宿主机上的真实路径：面板执行 docker run -v 时由守护进程在宿主机解析
+      - HOST_DATA_DIR=${PROJECT_DIR:?请在 .env 中设置 PROJECT_DIR 为项目绝对路径}/data
+    depends_on:
+      - sing-box
