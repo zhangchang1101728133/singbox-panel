@@ -16,6 +16,10 @@ ALL_PROTOCOLS = sorted(protocols.PROTOCOLS)
 QUIC_PROTOCOLS = {"hysteria2", "tuic"}
 
 # Reality 节点配置（结构对齐一键配置生成的内容）
+#
+# ⚠️ 下面全部是**一次性生成的假凭据**，不对应任何真实部署。
+#    千万不要把生产环境的密钥粘贴到这里：本仓库是公开的，密钥一旦提交
+#    就等于公开（而且 git 历史里会留下副本，删掉文件也删不干净）。
 REALITY_CONFIG = {
     "uuid": "11111111-1111-1111-1111-111111111111",
     "flow": "xtls-rprx-vision",
