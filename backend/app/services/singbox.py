@@ -69,8 +69,11 @@ class SingboxService:
         return {
             "dns": {
                 "servers": [
+                    # 走代理解析：查国外域名不会被污染
                     {"tag": "proxy-dns", "type": "tls", "server": "8.8.8.8", "detour": "proxy"},
-                    {"tag": "local", "type": "udp", "server": "114.114.114.114"}
+                    # 直连解析：用于解析「代理服务器自己的域名」和国内域名。
+                    # 用阿里 DNS 而不是 114：114 会对不存在的域名做劫持，用它解析代理域名有风险。
+                    {"tag": "local", "type": "udp", "server": "223.5.5.5"}
                 ],
                 "rules": [
                     {"domain_suffix": [".cn"], "server": "local"}
@@ -95,7 +98,12 @@ class SingboxService:
             ],
             "outbounds": all_outbounds,
             "route": {
-                "default_domain_resolver": {"server": "proxy-dns"},
+                # 必须是「直连」解析器！
+                # 这个字段用来解析 outbound 的服务器域名。如果指向 proxy-dns（detour=proxy），
+                # 就会形成循环依赖：连代理前要先解析代理的域名，而解析又要先连上代理。
+                # 症状很隐蔽 —— urltest 全部解析超时（auto 失效）、新建连接超时，
+                # 表现为「浏览勉强能用、下载这种多连接场景直接卡死」。
+                "default_domain_resolver": {"server": "local"},
                 "rules": [
                     {"inbound": "tun-in", "action": "sniff", "timeout": "1s"},
                     {"inbound": "mixed-in", "action": "sniff", "timeout": "1s"},

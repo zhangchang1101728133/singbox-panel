@@ -265,3 +265,50 @@ def test_all_eight_protocols_registered():
         "vless", "vmess", "shadowsocks", "hysteria2",
         "trojan", "tuic", "anytls", "snell",
     }
+
+
+# ── 客户端订阅配置（真实踩过的坑，必须回归）─────────────────
+
+class TestClientConfigResolver:
+    """DNS 循环依赖：解析代理域名时不能又依赖代理
+
+    曾经 default_domain_resolver 指向 detour=proxy 的解析器，导致
+    「连代理前要先解析代理域名、而解析又要先连代理」的死循环。
+    症状极隐蔽：urltest 全部解析超时（auto 失效）、新建连接超时，
+    表现为「浏览勉强能用、下载这种多连接场景直接卡死」。
+    """
+
+    def _cfg(self):
+        from app.services.singbox import SingboxService
+        return SingboxService.generate_client_config([])
+
+    def test_default_domain_resolver_is_not_proxied(self):
+        from app.services.singbox import SingboxService
+        cfg = self._cfg()
+        server_tag = cfg["route"]["default_domain_resolver"]["server"]
+        servers = {s["tag"]: s for s in cfg["dns"]["servers"]}
+        assert server_tag in servers, "default_domain_resolver 指向了不存在的解析器"
+        assert not servers[server_tag].get("detour"), (
+            "default_domain_resolver 不能指向经代理的解析器，否则解析代理域名会形成循环依赖"
+        )
+
+    def test_at_least_one_direct_resolver_exists(self):
+        cfg = self._cfg()
+        direct = [s for s in cfg["dns"]["servers"] if not s.get("detour")]
+        assert direct, "必须保留至少一个直连解析器用于解析代理服务器域名"
+
+    def test_proxied_resolver_still_used_for_app_queries(self):
+        """国外域名仍应走代理解析，避免 DNS 污染"""
+        cfg = self._cfg()
+        proxied = [s for s in cfg["dns"]["servers"] if s.get("detour") == "proxy"]
+        assert proxied, "应保留经代理的解析器，否则国外域名会拿到被污染的结果"
+
+    def test_tun_inbound_configured(self):
+        cfg = self._cfg()
+        tun = [i for i in cfg["inbounds"] if i["type"] == "tun"]
+        assert tun and tun[0]["auto_route"] is True
+
+    def test_cn_domains_resolve_locally(self):
+        cfg = self._cfg()
+        rules = cfg["dns"]["rules"]
+        assert any(".cn" in r.get("domain_suffix", []) for r in rules), "国内域名应走直连解析"
