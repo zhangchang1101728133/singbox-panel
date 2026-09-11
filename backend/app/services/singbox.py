@@ -168,10 +168,21 @@ class SingboxService:
         return config_path
 
     @classmethod
-    def save_subscription(cls, config: Dict[str, Any], token: str):
-        """保存订阅文件"""
+    def subscription_path(cls, sub_id: int) -> Path:
+        """订阅文件路径
+
+        文件名用自增 id，**不要**用 token：token 是访问凭据、可以轮换，
+        文件名跟着 token 走的话改 token 就得迁移文件；更要紧的是，
+        写文件和读文件的两处若各自拼名字，很容易分叉成两个文件
+        —— 曾经就因此让下载接口一直返回旧配置。
+        """
+        return cls.SUB_DIR / f"sub_{sub_id}.json"
+
+    @classmethod
+    def save_subscription(cls, config: Dict[str, Any], sub_id: int):
+        """保存订阅文件（按订阅 id 命名，见 subscription_path）"""
         cls.SUB_DIR.mkdir(parents=True, exist_ok=True)
-        sub_path = cls.SUB_DIR / f"{token}.json"
+        sub_path = cls.subscription_path(sub_id)
         with open(sub_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
         return sub_path

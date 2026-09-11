@@ -30,12 +30,8 @@ def _new_token() -> str:
 
 
 def _sub_file(sub_id: int):
-    """订阅文件路径
-
-    文件名用自增 id 而不是 token：id 不进 URL、不承担鉴权，token 可以随时轮换
-    而不必迁移文件。鉴权只发生在下载接口的 token → id 查表这一步。
-    """
-    return SingboxService.SUB_DIR / f"sub_{sub_id}.json"
+    """订阅文件路径（统一走 service，避免写/读两处各自拼名字而分叉）"""
+    return SingboxService.subscription_path(sub_id)
 
 
 @router.get("/api")
@@ -136,6 +132,6 @@ async def _generate_sub_file(db, sub_id: int, node_ids: List[int]):
             node["config"] = json.loads(node["config"])
     sub_nodes = [n for n in nodes if n["id"] in node_ids] if node_ids else nodes
     client_config = SingboxService.generate_client_config(sub_nodes)
-    SingboxService.save_subscription(client_config, f"sub_{sub_id}")  # 与 _sub_file 保持一致
+    SingboxService.save_subscription(client_config, sub_id)
 
 

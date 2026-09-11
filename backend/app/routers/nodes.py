@@ -192,7 +192,7 @@ async def regenerate_configs(db):
         sub_node_ids = json.loads(sub["node_ids"]) if isinstance(sub["node_ids"], str) else sub["node_ids"]
         sub_nodes = [n for n in nodes if n["id"] in sub_node_ids] if sub_node_ids else nodes
         client_config = SingboxService.generate_client_config(sub_nodes)
-        SingboxService.save_subscription(client_config, sub["token"])
+        SingboxService.save_subscription(client_config, sub["id"])
 
     await SingboxService.restart()
 
