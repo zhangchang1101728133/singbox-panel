@@ -2,7 +2,7 @@
 
 # sing-box 管理面板
 
-**基于 Vue 3 + FastAPI 的 sing-box 服务端管理面板**
+**基于 Vue 3 + TypeScript + FastAPI 的 sing-box 服务端管理面板**
 
 节点与订阅管理 · 一键配置 · 扫码导入 · 核心一键升级
 
@@ -139,6 +139,8 @@ singbox-panel/
 │   ├── Dockerfile            # 多阶段：node 构建 dist → python 托管
 │   ├── Dockerfile.dev        # uvicorn --reload
 │   ├── requirements.txt
+│   ├── requirements-dev.txt  # 测试依赖（pytest）
+│   ├── tests/                # protocols.py 单元测试
 │   └── app/
 │       ├── main.py           # JSON API + 托管前端 dist + SPA fallback
 │       ├── models/database.py
@@ -149,8 +151,11 @@ singbox-panel/
 │       └── routers/          # auth / nodes / subscription / api
 └── frontend/
     ├── Dockerfile.dev        # vite HMR
-    ├── vite.config.js        # dev 代理 → backend:8080
-    └── src/{views,components,api,stores,router}
+    ├── vite.config.ts        # dev 代理 → backend:8080
+    └── src/
+        ├── types/index.ts    # 与后端接口一一对应的类型
+        ├── env.d.ts          # vite client 类型 + .vue 模块声明
+        └── {views,components,api,stores,router}
 ```
 
 ## 🛠 维护
@@ -181,7 +186,15 @@ pip install -r requirements-dev.txt
 pytest tests/ -q
 ```
 
-覆盖内容：8 个协议的 inbound/outbound 结构、注册表一致性（端口/缩写唯一、字段不重复）、版本门控，以及几个**曾经真实踩过的坑**：
+前端类型检查（`build` 已内置，类型不过不会产出镜像）：
+
+```bash
+cd frontend
+npm install
+npm run typecheck      # = vue-tsc --noEmit
+```
+
+后端测试覆盖内容：8 个协议的 inbound/outbound 结构、注册表一致性（端口/缩写唯一、字段不重复）、版本门控，以及几个**曾经真实踩过的坑**：
 
 - Reality 入站不能带 `certificate_path` / `key_path`（sing-box 会报 `certificate is unavailable in reality`）
 - Reality 客户端必须保留 uTLS（否则报 `uTLS is required by reality client`）
