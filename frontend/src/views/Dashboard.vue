@@ -1,11 +1,12 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   useMessage, useDialog,
   NLayout, NLayoutHeader, NLayoutContent, NButton, NSpace, NText, NIcon,
 } from 'naive-ui'
-import { api } from '../api/client'
+import { api, errMsg } from '../api/client'
+import type { Node, ServerInfo, Stats, Subscription } from '../types/index'
 import { useAuthStore } from '../stores/auth'
 import { useThemeStore } from '../stores/theme'
 import NodeList from '../components/NodeList.vue'
@@ -20,27 +21,27 @@ const dialog = useDialog()
 const auth = useAuthStore()
 const themeStore = useThemeStore()
 
-const nodes = ref([])
-const subs = ref([])
+const nodes = ref<Node[]>([])
+const subs = ref<Subscription[]>([])
 const serverIp = ref('')
-const stats = ref({ total_nodes: 0, active_nodes: 0, total_subs: 0, active_subs: 0 })
+const stats = ref<Stats>({ total_nodes: 0, active_nodes: 0, total_subs: 0, active_subs: 0 })
 const loading = ref(false)
 
 async function loadAll() {
   loading.value = true
   try {
     const [n, s, info, st] = await Promise.all([
-      api.get('/nodes/api'),
-      api.get('/sub/api'),
-      api.get('/api/server-info'),
-      api.get('/api/stats'),
+      api.get<Node[]>('/nodes/api'),
+      api.get<Subscription[]>('/sub/api'),
+      api.get<ServerInfo>('/api/server-info'),
+      api.get<Stats>('/api/stats'),
     ])
     nodes.value = n
     subs.value = s
     serverIp.value = info.server_ip
     stats.value = st
   } catch (e) {
-    message.error(e.message || '加载失败')
+    message.error(errMsg(e) || '加载失败')
   } finally {
     loading.value = false
   }

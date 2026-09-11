@@ -1,26 +1,28 @@
-<script setup>
-import { ref } from 'vue'
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import {
   useMessage, useDialog,
   NCard, NButton, NSpace, NTag, NSwitch, NEmpty, NList, NListItem, NText, NSpin,
 } from 'naive-ui'
-import { api } from '../api/client'
+import type { PropType } from 'vue'
+import { api, errMsg } from '../api/client'
+import type { Node, ProtocolsResponse } from '../types/index'
 import NodeFormModal from './NodeFormModal.vue'
 import AppIcon from './AppIcon.vue'
 
 const props = defineProps({
-  nodes: { type: Array, default: () => [] },
+  nodes: { type: Array as PropType<Node[]>, default: () => [] },
   loading: Boolean,
 })
 const emit = defineEmits(['refresh'])
 const message = useMessage()
 const dialog = useDialog()
 
-const formRef = ref(null)
+const formRef = ref<InstanceType<typeof NodeFormModal> | null>(null)
 const collapsed = ref(false)
 
 // 各协议配色
-const PROTO_COLORS = {
+const PROTO_COLORS: Record<string, string> = {
   vless: '#0ea5a4',
   vmess: '#6366f1',
   shadowsocks: '#f59e0b',
@@ -30,36 +32,36 @@ const PROTO_COLORS = {
   anytls: '#22c55e',
   snell: '#14b8a6',
 }
-function protoColor(type) { return PROTO_COLORS[type] || '#64748b' }
+function protoColor(type: string) { return PROTO_COLORS[type] || '#64748b' }
 
 // 协议缩写（统一短码，等宽显示，让右侧按钮对齐）
-const PROTO_ABBR = {
-  vless: 'VL',
-  vmess: 'VM',
-  shadowsocks: 'SS',
-  hysteria2: 'HY2',
-  trojan: 'TJ',
-  tuic: 'TU',
-  anytls: 'ATLS',
-  snell: 'SN',
-}
-function protoAbbr(type) { return PROTO_ABBR[type] || (type || '').slice(0, 3).toUpperCase() }
-
-function openAdd() { formRef.value.openAdd() }
-function openEdit(node) { formRef.value.openEdit(node) }
-
-async function toggle(node, val) {
+// 从后端注册表读取，避免前端再维护一份和 protocols.py 重复的映射
+const PROTO_ABBR = ref<Record<string, string>>({})
+onMounted(async () => {
   try {
-    await api.put(`/nodes/api/${node.id}`, { enabled: val })
+    const r = await api.get<ProtocolsResponse>('/api/protocols')
+    PROTO_ABBR.value = Object.fromEntries((r.protocols || []).map((p) => [p.id, p.abbr]))
+  } catch {
+    // 拉不到就退化成 type 前 3 位，不影响列表渲染
+  }
+})
+function protoAbbr(type: string) { return PROTO_ABBR.value[type] || (type || '').slice(0, 3).toUpperCase() }
+
+function openAdd() { formRef.value?.openAdd() }
+function openEdit(node: Node) { formRef.value?.openEdit(node) }
+
+async function toggle(node: Node, val: boolean) {
+  try {
+    await api.put<{ message: string }>(`/nodes/api/${node.id}`, { enabled: val })
     message.success(val ? '已启用' : '已禁用')
     emit('refresh')
   } catch (e) {
-    message.error(e.message)
+    message.error(errMsg(e))
     emit('refresh')
   }
 }
 
-function confirmDelete(node) {
+function confirmDelete(node: Node) {
   dialog.warning({
     title: '删除节点',
     content: `确定删除节点「${node.name}」？`,
@@ -67,11 +69,11 @@ function confirmDelete(node) {
     negativeText: '取消',
     onPositiveClick: async () => {
       try {
-        await api.del(`/nodes/api/${node.id}`)
+        await api.del<{ message: string }>(`/nodes/api/${node.id}`)
         message.success('节点已删除')
         emit('refresh')
       } catch (e) {
-        message.error(e.message)
+        message.error(errMsg(e))
       }
     },
   })

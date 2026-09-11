@@ -1,23 +1,25 @@
-<script setup>
+<script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
+import type { PropType } from 'vue'
 import {
   useMessage,
   NModal, NForm, NFormItem, NInput, NSelect, NButton, NSpace, NText,
 } from 'naive-ui'
-import { api } from '../api/client'
+import { api, errMsg } from '../api/client'
+import type { Node, Subscription } from '../types/index'
 
 const props = defineProps({
-  nodes: { type: Array, default: () => [] },
+  nodes: { type: Array as PropType<Node[]>, default: () => [] },
 })
 const emit = defineEmits(['refresh'])
 const message = useMessage()
 
 const show = ref(false)
-const editId = ref(null)
+const editId = ref<number | null>(null)
 const submitting = ref(false)
 const title = computed(() => (editId.value ? '编辑订阅' : '创建订阅'))
 
-const f = reactive({ name: '', slug: '', nodeIds: [] })
+const f = reactive<{ name: string; slug: string; nodeIds: number[] }>({ name: '', slug: '', nodeIds: [] })
 
 // 节点多选项：空数组表示包含全部节点
 const nodeOptions = computed(() =>
@@ -36,7 +38,7 @@ function openAdd() {
   show.value = true
 }
 
-function openEdit(sub) {
+function openEdit(sub: Subscription) {
   reset()
   editId.value = sub.id
   f.name = sub.name
@@ -57,16 +59,16 @@ async function submit() {
   }
   try {
     if (editId.value) {
-      await api.put(`/sub/api/${editId.value}`, payload)
+      await api.put<{ message: string }>(`/sub/api/${editId.value}`, payload)
       message.success('订阅已更新')
     } else {
-      await api.post('/sub/api/add', payload)
+      await api.post<{ message: string }>('/sub/api/add', payload)
       message.success('订阅已创建')
     }
     show.value = false
     emit('refresh')
   } catch (e) {
-    message.error(e.message)
+    message.error(errMsg(e))
   } finally {
     submitting.value = false
   }

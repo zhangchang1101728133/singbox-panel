@@ -523,6 +523,7 @@ def snell_defaults(**kw):
 PROTOCOLS = {
     "vless": {
         "label": "VLESS + Reality",
+        "abbr": "VL",
         "min_version": None,
         "default_port": 44300,
         "inbound": vless_inbound,
@@ -539,6 +540,7 @@ PROTOCOLS = {
     },
     "vmess": {
         "label": "VMess",
+        "abbr": "VM",
         "min_version": None,
         "default_port": 44301,
         "inbound": vmess_inbound,
@@ -555,6 +557,7 @@ PROTOCOLS = {
     },
     "shadowsocks": {
         "label": "Shadowsocks",
+        "abbr": "SS",
         "min_version": None,
         "default_port": 44302,
         "inbound": shadowsocks_inbound,
@@ -567,6 +570,7 @@ PROTOCOLS = {
     },
     "hysteria2": {
         "label": "Hysteria2",
+        "abbr": "HY2",
         "min_version": None,
         "default_port": 44303,
         "inbound": hysteria2_inbound,
@@ -582,6 +586,7 @@ PROTOCOLS = {
     },
     "trojan": {
         "label": "Trojan",
+        "abbr": "TJ",
         "min_version": None,
         "default_port": 44304,
         "inbound": trojan_inbound,
@@ -593,6 +598,7 @@ PROTOCOLS = {
     },
     "tuic": {
         "label": "TUIC",
+        "abbr": "TU",
         "min_version": None,
         "default_port": 44305,
         "inbound": tuic_inbound,
@@ -606,6 +612,7 @@ PROTOCOLS = {
     },
     "anytls": {
         "label": "AnyTLS",
+        "abbr": "ATLS",
         "min_version": "1.12.0",
         "default_port": 44306,
         "inbound": anytls_inbound,
@@ -617,6 +624,7 @@ PROTOCOLS = {
     },
     "snell": {
         "label": "Snell",
+        "abbr": "SN",
         "min_version": "1.14.0",
         "default_port": 44307,
         "inbound": snell_inbound,
@@ -670,6 +678,7 @@ def protocol_list(core_version: str = None) -> list:
         items.append({
             "id": pid,
             "label": proto["label"],
+            "abbr": proto["abbr"],
             "default_port": proto["default_port"],
             "min_version": proto.get("min_version"),
             "available": available,

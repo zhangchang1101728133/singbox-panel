@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { NConfigProvider, NMessageProvider, NDialogProvider, NGlobalStyle, darkTheme, lightTheme, zhCN, dateZhCN } from 'naive-ui'
 import { RouterView } from 'vue-router'

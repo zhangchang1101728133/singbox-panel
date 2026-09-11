@@ -1,22 +1,32 @@
-<script setup>
+<script setup lang="ts">
 import { computed, ref, watch, onMounted } from 'vue'
+import type { PropType } from 'vue'
+import type { Stats } from '../types/index'
+
+type StatKey = keyof Required<Pick<Stats, 'total_nodes' | 'active_nodes' | 'total_subs'>>
+
+interface StatItem {
+  key: StatKey
+  label: string
+  accent: string
+}
 
 const props = defineProps({
-  stats: { type: Object, default: () => ({}) },
+  stats: { type: Object as PropType<Stats>, default: () => ({}) },
   serverIp: String,
 })
 
-const items = computed(() => [
+const items = computed<StatItem[]>(() => [
   { key: 'total_nodes', label: '节点', accent: '#0ea5a4' },
   { key: 'active_nodes', label: '启用', accent: '#22c55e' },
   { key: 'total_subs', label: '订阅', accent: '#6366f1' },
 ])
 
 // 数字滚动计数动画
-const display = ref({ total_nodes: 0, active_nodes: 0, total_subs: 0 })
+const display = ref<Record<StatKey, number>>({ total_nodes: 0, active_nodes: 0, total_subs: 0 })
 
-function animateTo(target) {
-  const keys = ['total_nodes', 'active_nodes', 'total_subs']
+function animateTo(target: Stats) {
+  const keys: StatKey[] = ['total_nodes', 'active_nodes', 'total_subs']
   keys.forEach((k) => {
     const to = target[k] ?? 0
     const from = display.value[k] ?? 0

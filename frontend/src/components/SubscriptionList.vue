@@ -1,17 +1,19 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from 'vue'
 import {
   useMessage, useDialog,
   NCard, NButton, NSpace, NEmpty, NList, NListItem, NText, NModal,
 } from 'naive-ui'
+import type { PropType } from 'vue'
 import QrcodeVue from 'qrcode.vue'
-import { api } from '../api/client'
+import { api, errMsg } from '../api/client'
+import type { Node, Subscription } from '../types/index'
 import SubFormModal from './SubFormModal.vue'
 import AppIcon from './AppIcon.vue'
 
 const props = defineProps({
-  subs: { type: Array, default: () => [] },
-  nodes: { type: Array, default: () => [] },
+  subs: { type: Array as PropType<Subscription[]>, default: () => [] },
+  nodes: { type: Array as PropType<Node[]>, default: () => [] },
   serverIp: String,
 })
 const emit = defineEmits(['refresh'])
@@ -19,10 +21,10 @@ const message = useMessage()
 const dialog = useDialog()
 const collapsed = ref(false)
 
-const formRef = ref(null)
+const formRef = ref<InstanceType<typeof SubFormModal> | null>(null)
 const origin = computed(() => window.location.origin)
 
-function subUrl(sub) {
+function subUrl(sub: Subscription) {
   const name = sub.slug || sub.token
   return `${origin.value}/sub/download/${name}`
 }
@@ -31,16 +33,16 @@ function subUrl(sub) {
 const qrShow = ref(false)
 const qrUrl = ref('')
 const qrName = ref('')
-function openQr(sub) {
+function openQr(sub: Subscription) {
   qrUrl.value = subUrl(sub)
   qrName.value = sub.name
   qrShow.value = true
 }
 
-function openAdd() { formRef.value.openAdd() }
-function openEdit(sub) { formRef.value.openEdit(sub) }
+function openAdd() { formRef.value?.openAdd() }
+function openEdit(sub: Subscription) { formRef.value?.openEdit(sub) }
 
-async function copyUrl(sub) {
+async function copyUrl(sub: Subscription) {
   const url = subUrl(sub)
   try {
     await navigator.clipboard.writeText(url)
@@ -58,11 +60,11 @@ function fixModalFocus() {
   // naive modal 内部有一个 aria-hidden="true" 的隐藏 div 会抢焦点
   // 导致浏览器报 "Blocked aria-hidden on an element because its descendant retained focus"
   // 弹窗打开后把焦点移到弹窗标题上，绕开这个问题
-  const el = document.querySelector('.n-card')
+  const el = document.querySelector<HTMLElement>('.n-card')
   if (el) el.focus({ preventScroll: true })
 }
 
-function confirmDelete(sub) {
+function confirmDelete(sub: Subscription) {
   dialog.warning({
     title: '删除订阅',
     content: `确定删除订阅「${sub.name}」？`,
@@ -70,11 +72,11 @@ function confirmDelete(sub) {
     negativeText: '取消',
     onPositiveClick: async () => {
       try {
-        await api.del(`/sub/api/${sub.id}`)
+        await api.del<{ message: string }>(`/sub/api/${sub.id}`)
         message.success('订阅已删除')
         emit('refresh')
       } catch (e) {
-        message.error(e.message)
+        message.error(errMsg(e))
       }
     },
   })

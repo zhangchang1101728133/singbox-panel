@@ -1,7 +1,9 @@
-<script setup>
+<script setup lang="ts">
+import type { PropType } from 'vue'
+
 // 统一描线图标（stroke 跟随 currentColor，跨平台一致，无外部依赖）
 const props = defineProps({
-  name: { type: String, required: true },
+  name: { type: String as PropType<IconName>, required: true },
   size: { type: [Number, String], default: 18 },
 })
 
@@ -16,7 +18,10 @@ const PATHS = {
   refresh: 'M4 12a8 8 0 0 1 14-5l2 2M20 12a8 8 0 0 1-14 5l-2-2M18 4v5h-5M6 20v-5h5',
   power: 'M12 4v8M8 6a7 7 0 1 0 8 0',
   chevron: 'M6 9l6 6 6-6',
-}
+} as const
+
+/** 图标名由 PATHS 的键推导，写错名字会在类型检查阶段就报错 */
+type IconName = keyof typeof PATHS
 </script>
 
 <template>

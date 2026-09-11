@@ -4,9 +4,9 @@ import {
   useMessage, useDialog,
   NCard, NSpace, NButton, NModal, NForm, NFormItem, NInput, NText, NCheckbox,
 } from 'naive-ui'
-import { api } from '../api/client'
+import { api, errMsg } from '../api/client'
 import AppIcon from './AppIcon.vue'
-import type { ProtocolsResponse, Protocol, SingboxVersion } from '../types/index'
+import type { MessageResponse, ProtocolsResponse, Protocol, SingboxVersion, UpdateResponse } from '../types/index'
 
 const props = defineProps({
   hasNodes: Boolean,
@@ -40,7 +40,7 @@ async function doQuick() {
   if (!qSelected.value.length) { message.warning('请至少选择一个协议'); return }
   quickLoading.value = true
   try {
-    const r = await api.post('/api/quick-setup', {
+    const r = await api.post<MessageResponse>('/api/quick-setup', {
       server: qServer.value.trim(),
       sni: qSni.value.trim() || 'www.taobao.com',
       protocols: qSelected.value,
@@ -49,7 +49,7 @@ async function doQuick() {
     quickShow.value = false
     emit('refresh')
   } catch (e) {
-    message.error(e.message)
+    message.error(errMsg(e))
   } finally {
     quickLoading.value = false
   }
@@ -58,7 +58,7 @@ async function doQuick() {
 // ── 导出配置 ──
 async function doExport() {
   try {
-    const data = await api.get('/api/export')
+    const data = await api.get<unknown>('/api/export')
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -68,7 +68,7 @@ async function doExport() {
     URL.revokeObjectURL(url)
     message.success('配置已导出')
   } catch (e) {
-    message.error(e.message)
+    message.error(errMsg(e))
   }
 }
 
@@ -81,11 +81,11 @@ function confirmClear() {
     negativeText: '取消',
     onPositiveClick: async () => {
       try {
-        await api.post('/api/clear-all')
+        await api.post<MessageResponse>('/api/clear-all')
         message.success('已清空')
         emit('refresh')
       } catch (e) {
-        message.error(e.message)
+        message.error(errMsg(e))
       }
     },
   })
@@ -116,7 +116,7 @@ async function openUpdate() {
       updateInfo.value = `已是最新版本 ${r.version}`
     }
   } catch (e) {
-    updateInfo.value = `检查失败：${e.message}`
+    updateInfo.value = `检查失败：${errMsg(e)}`
   }
 }
 
@@ -125,19 +125,19 @@ async function doUpdate() {
   updateInfo.value = '正在拉取镜像并重建容器，请稍候...'
   updateLog.value = []
   try {
-    const r = await api.post('/api/singbox/update')
+    const r = await api.post<UpdateResponse>('/api/singbox/update')
     updateInfo.value = r.message || '更新成功'
     updateLog.value = r.log || []
     message.success('sing-box 已更新')
     updateAvailable.value = false
   } catch (e) {
-    updateInfo.value = `更新失败：${e.message}`
+    updateInfo.value = `更新失败：${errMsg(e)}`
   } finally {
     updating.value = false
   }
 }
 
-function toggleProtocol(id, checked) {
+function toggleProtocol(id: string, checked: boolean) {
   if (checked) {
     if (!qSelected.value.includes(id)) qSelected.value.push(id)
   } else {

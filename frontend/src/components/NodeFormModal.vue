@@ -5,8 +5,8 @@ import {
   NModal, NForm, NFormItem, NInput, NInputNumber, NSelect, NButton, NSpace,
   NInputGroup, NSwitch, NText, NAlert,
 } from 'naive-ui'
-import { api } from '../api/client'
-import type { ProtocolsResponse, Protocol } from '../types/index'
+import { api, errMsg } from '../api/client'
+import type { MessageResponse, Node, NodeConfig, ProtocolField, ProtocolsResponse, Protocol } from '../types/index'
 
 const emit = defineEmits(['refresh'])
 const message = useMessage()
@@ -15,16 +15,22 @@ const protocols = ref<Protocol[]>([])
 const coreVersion = ref<string | null>(null)
 
 const show = ref(false)
-const editId = ref(null)
+const editId = ref<number | null>(null)
 const submitting = ref(false)
 const title = computed(() => (editId.value ? '编辑节点' : '添加节点'))
 
-const f = reactive({
+const f = reactive<{
+  name: string
+  type: string
+  server: string
+  port: number | null
+  cfg: NodeConfig   // 扁平化存储，key 为协议注册表里的点号路径
+}>({
   name: '',
   type: 'vless',
   server: '',
   port: null,
-  cfg: {},   // 扁平化存储，key 为协议注册表里的点号路径
+  cfg: {},
 })
 
 const protocolOptions = computed(() =>
@@ -41,13 +47,13 @@ const currentFields = computed(() => {
 })
 
 // ── 点号路径读写 ────────────────────────────────────────────
-function getPath(obj, path) {
-  return path.split('.').reduce((acc, k) => (acc == null ? acc : acc[k]), obj)
+function getPath(obj: NodeConfig, path: string): any {
+  return path.split('.').reduce<any>((acc, k) => (acc == null ? acc : acc[k]), obj)
 }
 
-function setPath(obj, path, value) {
+function setPath(obj: NodeConfig, path: string, value: unknown) {
   const keys = path.split('.')
-  let cur = obj
+  let cur: NodeConfig = obj
   keys.forEach((k, i) => {
     if (i === keys.length - 1) cur[k] = value
     else {
@@ -58,19 +64,19 @@ function setPath(obj, path, value) {
 }
 
 // 随机值由后端生成：Shadowsocks 2022 的密钥格式取决于加密方式，规则不放在前端
-async function generate(fld) {
+async function generate(fld: ProtocolField) {
   try {
-    const r = await api.post(`/api/protocols/${f.type}/random`, {
+    const r = await api.post<{ value: string }>(`/api/protocols/${f.type}/random`, {
       field: fld.key,
       config: buildConfig(),
     })
     f.cfg[fld.key] = r.value
   } catch (e) {
-    message.error(`生成失败：${e.message}`)
+    message.error(`生成失败：${errMsg(e)}`)
   }
 }
 
-function defaultPort(type) {
+function defaultPort(type: string) {
   const p = protocols.value.find((x) => x.id === type)
   return p ? p.default_port : 44300
 }
@@ -85,7 +91,7 @@ function reset() {
 
 function applyDefaults() {
   // 切换协议时，按注册表字段重置表单值
-  const values = {}
+  const values: NodeConfig = {}
   currentFields.value.forEach((fld) => {
     if (fld.default !== undefined) values[fld.key] = fld.default
     else if (fld.type === 'bool') values[fld.key] = false
@@ -99,20 +105,20 @@ function applyDefaults() {
 function openAdd() {
   reset()
   editId.value = null
-  f.type = (protocols.value.find((p) => p.available) || {}).id || 'vless'
+  f.type = protocols.value.find((p) => p.available)?.id ?? 'vless'
   applyDefaults()
   show.value = true
 }
 
-function openEdit(node) {
+function openEdit(node: Node) {
   reset()
   editId.value = node.id
   f.name = node.name
   f.type = node.type
   f.server = node.server
   f.port = node.server_port
-  const c = node.config || {}
-  const values = {}
+  const c: NodeConfig = node.config || {}
+  const values: NodeConfig = {}
   currentFields.value.forEach((fld) => {
     const v = getPath(c, fld.key)
     if (v === undefined || v === null) {
@@ -127,8 +133,8 @@ function openEdit(node) {
   show.value = true
 }
 
-function buildConfig() {
-  const out = {}
+function buildConfig(): NodeConfig {
+  const out: NodeConfig = {}
   currentFields.value.forEach((fld) => {
     let v = f.cfg[fld.key]
     if (v === '' || v === null || v === undefined) return
@@ -146,7 +152,7 @@ async function loadProtocols() {
     protocols.value = r.protocols
     coreVersion.value = r.core_version
   } catch (e) {
-    message.error(`协议列表加载失败：${e.message}`)
+    message.error(`协议列表加载失败：${errMsg(e)}`)
   }
 }
 
@@ -165,16 +171,16 @@ async function submit() {
   }
   try {
     if (editId.value) {
-      await api.put(`/nodes/api/${editId.value}`, payload)
+      await api.put<MessageResponse>(`/nodes/api/${editId.value}`, payload)
       message.success('节点已更新')
     } else {
-      await api.post('/nodes/api/add', payload)
+      await api.post<MessageResponse>('/nodes/api/add', payload)
       message.success('节点已添加')
     }
     show.value = false
     emit('refresh')
   } catch (e) {
-    message.error(e.message)
+    message.error(errMsg(e))
   } finally {
     submitting.value = false
   }

@@ -1,7 +1,8 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage, NCard, NForm, NFormItem, NInput, NButton } from 'naive-ui'
+import { errMsg } from '../api/client'
 import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
@@ -23,25 +24,36 @@ async function onLogin() {
     message.success('登录成功')
     router.push({ name: 'dashboard' })
   } catch (e) {
-    message.error(e.message || '登录失败')
+    message.error(errMsg(e) || '登录失败')
   } finally {
     loading.value = false
   }
 }
 
 // ── 粒子背景 ──
-const canvas = ref(null)
-let raf = null
-function initParticles() {
-  const c = canvas.value
-  if (!c) return
-  const ctx = c.getContext('2d')
-  let w, h, pts
-  const seed = (n) => ((Math.sin(n * 12.9898) * 43758.5453) % 1 + 1) % 1
+interface Particle {
+  x: number; y: number; vx: number; vy: number
+}
+
+const canvas = ref<HTMLCanvasElement | null>(null)
+let raf: number | null = null
+
+function initParticles(): (() => void) | undefined {
+  const el = canvas.value
+  if (!el) return
+  const context = el.getContext('2d')
+  if (!context) return
+  // 显式标注：下面这些变量会在嵌套函数里被引用，TS 不会保留收窄结果
+  const c: HTMLCanvasElement = el
+  const ctx: CanvasRenderingContext2D = context
+  let w = 0
+  let h = 0
+  let pts: Particle[] = []
+  const seed = (n: number) => ((Math.sin(n * 12.9898) * 43758.5453) % 1 + 1) % 1
   function resize() {
     w = c.width = c.offsetWidth
     h = c.height = c.offsetHeight
-    pts = Array.from({ length: 56 }, (_, i) => ({
+    pts = Array.from({ length: 56 }, (_, i): Particle => ({
       x: seed(i + 1) * w, y: seed(i + 7) * h,
       vx: (seed(i + 3) - 0.5) * 0.4, vy: (seed(i + 5) - 0.5) * 0.4,
     }))
@@ -75,7 +87,7 @@ function initParticles() {
   draw()
   return () => window.removeEventListener('resize', resize)
 }
-let cleanup = null
+let cleanup: (() => void) | undefined
 onMounted(() => { cleanup = initParticles() })
 onBeforeUnmount(() => { if (raf) cancelAnimationFrame(raf); if (cleanup) cleanup() })
 </script>

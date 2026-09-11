@@ -43,6 +43,17 @@ async function request<T>(url: string, opts: RequestInit & { form?: Record<strin
   return data as T
 }
 
+/**
+ * 把 catch 到的 unknown 安全地转成可展示的错误文案。
+ * strict 模式下 catch 变量是 unknown，直接读 .message 会报错，
+ * 与其在每个 catch 里重复判断，不如统一走这里。
+ */
+export function errMsg(e: unknown): string {
+  if (e instanceof Error) return e.message
+  if (typeof e === 'string') return e
+  return '未知错误'
+}
+
 export const api = {
   get: <T>(url: string) => request<T>(url),
   post: <T>(url: string, body?: unknown) => request<T>(url, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),
