@@ -170,6 +170,24 @@ docker compose down
 tar czf backup-$(date +%F).tar.gz data/
 ```
 
+## 🧪 测试
+
+协议配置生成是纯逻辑，测试不需要 sing-box 二进制，也不依赖数据库：
+
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+pytest tests/ -q
+```
+
+覆盖内容：8 个协议的 inbound/outbound 结构、注册表一致性（端口/缩写唯一、字段不重复）、版本门控，以及几个**曾经真实踩过的坑**：
+
+- Reality 入站不能带 `certificate_path` / `key_path`（sing-box 会报 `certificate is unavailable in reality`）
+- Reality 客户端必须保留 uTLS（否则报 `uTLS is required by reality client`）
+- QUIC 协议（hysteria2 / tuic）的客户端**不能**带 uTLS（否则报 `unsupported usage for uTLS`）
+- Shadowsocks 2022 的密码长度必须与加密方式匹配（否则启动报 `bad key`）
+
 ## ⚠️ 注意事项
 
 - **Reality 伪装域名必须支持 TLS 1.3**。Reality 强依赖 TLS 1.3，选到不支持的域名（如 `www.baidu.com`、`www.qq.com`）会表现为「服务端把客户端判为探测流量、回落到真实站点」，客户端只报 `reality verification failed`，极难排查。默认值 `www.taobao.com` 已实测 TLS1.3 + h2 且握手稳定。
