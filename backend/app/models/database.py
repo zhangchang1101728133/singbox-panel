@@ -1,5 +1,6 @@
 """数据库模型和连接管理"""
 import os
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -69,6 +70,22 @@ async def init_db():
             await db.execute("ALTER TABLE subscriptions ADD COLUMN slug TEXT DEFAULT ''")
 
         await db.commit()
+
+        # 迁移：早期版本的订阅 token 是 f"sub_{id}"，可枚举。下载接口未认证，
+        # token 即唯一凭据，所以必须换成随机值。
+        # 幂等：只替换恰好是 "sub_"+纯数字 的旧格式，随机 token 不会被误伤。
+        cursor = await db.execute("SELECT id, token FROM subscriptions")
+        legacy = [
+            sub_id for sub_id, token in await cursor.fetchall()
+            if token.startswith("sub_") and token[4:].isdigit()
+        ]
+        for sub_id in legacy:
+            await db.execute(
+                "UPDATE subscriptions SET token = ? WHERE id = ?",
+                (secrets.token_urlsafe(24), sub_id),
+            )
+        if legacy:
+            await db.commit()
 
         # 插入默认管理员
         cursor = await db.execute("SELECT COUNT(*) FROM users WHERE is_admin = TRUE")
