@@ -182,11 +182,13 @@ async def snapshot() -> dict:
                 await db.commit()
 
     nxt = _next_period_start(cur_start)
-    # 方向要按"客户端视角"给：服务端 RX（收到的）是客户端上传，
-    # 服务端 TX（发出的）才是客户端下载。写反了客户端流量条会上下颠倒。
+    # 客户端（v2rayN 等）把 upload/download 分两栏显示，而中间那个 "/" 只跟在
+    # download 后面，用户看到的"已用"永远是 download 那一栏。所以这里把上行
+    # 并进 download 一起给，客户端显示的已用量才和面板、服务商控制台一致。
+    # 内部仍分开记账（rx_used / tx_used），需要看单向明细时取原始字段即可。
     return {
-        "upload": rx_used,
-        "download": tx_used,
+        "upload": 0,
+        "download": rx_used + tx_used,
         "total": total_bytes(cfg),
         "expire": int(nxt.timestamp()),
         "period_start": cur_start.isoformat(),
