@@ -15,6 +15,7 @@ const props = defineProps({
   subs: { type: Array as PropType<Subscription[]>, default: () => [] },
   nodes: { type: Array as PropType<Node[]>, default: () => [] },
   serverIp: String,
+  baseUrl: String,
 })
 const emit = defineEmits(['refresh'])
 const message = useMessage()
@@ -22,7 +23,8 @@ const dialog = useDialog()
 const collapsed = ref(false)
 
 const formRef = ref<InstanceType<typeof SubFormModal> | null>(null)
-const origin = computed(() => window.location.origin)
+// 优先用后端配置的对外地址（PUBLIC_BASE_URL），没有才退回浏览器地址
+const origin = computed(() => props.baseUrl || window.location.origin)
 
 function subUrl(sub: Subscription) {
   const name = sub.slug || sub.token

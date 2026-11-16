@@ -313,3 +313,17 @@ class SingboxService:
             return resp.text.strip()
         except Exception:
             return configured or "127.0.0.1"
+
+    @staticmethod
+    def get_public_base_url() -> str:
+        """面板对外访问地址，用于拼订阅链接
+
+        优先 PUBLIC_BASE_URL（如 https://940122.xyz），否则回退到 IP:端口。
+        不能用浏览器的 location.origin：用 IP 打开面板时订阅链接就会跟着变成 IP，
+        换个入口访问就再也对不上了。
+        """
+        configured = os.getenv("PUBLIC_BASE_URL", "").strip()
+        if configured:
+            return configured.rstrip("/")
+        port = os.getenv("PANEL_PORT", "8080")
+        return f"http://{SingboxService.get_server_ip()}:{port}"

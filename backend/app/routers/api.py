@@ -48,7 +48,10 @@ async def random_field_value(protocol_id: str, req: RandomRequest, user: dict = 
 @router.get("/server-info")
 async def server_info(user: dict = Depends(get_current_user)):
     """服务器信息：公网 IP（前端拼订阅链接用）"""
-    return {"server_ip": SingboxService.get_server_ip()}
+    return {
+        "server_ip": SingboxService.get_server_ip(),
+        "base_url": SingboxService.get_public_base_url(),
+    }
 
 
 @router.get("/stats")
@@ -180,13 +183,13 @@ async def quick_setup(req: QuickSetupRequest, user: dict = Depends(get_current_u
             created.append(node["type"])
         await db.commit()
 
-        # 创建默认订阅（用 ID 作为文件名）
+        # 创建默认订阅（文件按 id 命名，token 随机不可枚举）
         cursor = await db.execute(
             "INSERT INTO subscriptions (user_id, name, token, slug, node_ids, enabled) VALUES (?, ?, '', '', '[]', TRUE)",
             (user["id"], "默认订阅")
         )
         sub_id = cursor.lastrowid
-        sub_token = f"sub_{sub_id}"
+        sub_token = secrets.token_urlsafe(24)
         await db.execute("UPDATE subscriptions SET token = ? WHERE id = ?", (sub_token, sub_id))
         await db.commit()
 

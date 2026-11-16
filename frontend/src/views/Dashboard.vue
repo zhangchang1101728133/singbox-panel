@@ -24,6 +24,7 @@ const themeStore = useThemeStore()
 const nodes = ref<Node[]>([])
 const subs = ref<Subscription[]>([])
 const serverIp = ref('')
+const publicBaseUrl = ref('')
 const stats = ref<Stats>({ total_nodes: 0, active_nodes: 0, total_subs: 0, active_subs: 0 })
 const loading = ref(false)
 
@@ -39,6 +40,7 @@ async function loadAll() {
     nodes.value = n
     subs.value = s
     serverIp.value = info.server_ip
+    publicBaseUrl.value = info.base_url
     stats.value = st
   } catch (e) {
     message.error(errMsg(e) || '加载失败')
@@ -94,6 +96,7 @@ onMounted(loadAll)
           :subs="subs"
           :nodes="nodes"
           :server-ip="serverIp"
+          :base-url="publicBaseUrl"
           @refresh="loadAll" />
       </div>
     </n-layout-content>

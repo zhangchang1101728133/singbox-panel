@@ -87,6 +87,7 @@ export interface Stats {
 /** GET /api/server-info */
 export interface ServerInfo {
   server_ip: string
+  base_url: string
 }
 
 export interface MessageResponse {
