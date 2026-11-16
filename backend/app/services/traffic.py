@@ -182,9 +182,11 @@ async def snapshot() -> dict:
                 await db.commit()
 
     nxt = _next_period_start(cur_start)
+    # 方向要按"客户端视角"给：服务端 RX（收到的）是客户端上传，
+    # 服务端 TX（发出的）才是客户端下载。写反了客户端流量条会上下颠倒。
     return {
-        "upload": tx_used,
-        "download": rx_used,
+        "upload": rx_used,
+        "download": tx_used,
         "total": total_bytes(cfg),
         "expire": int(nxt.timestamp()),
         "period_start": cur_start.isoformat(),
@@ -223,8 +225,9 @@ async def align_used(used_gb: float) -> dict:
         rx_used = (row["rx_used"] or 0) if row else 0
         tx_used = (row["tx_used"] or 0) if row else 0
         delta = target - (rx_used + tx_used)
-        new_rx = max(0, rx_used + delta)
-        await db.execute("UPDATE traffic SET rx_used = ? WHERE id = 1", (new_rx,))
+        # 代理流量以下载为主，差额记到 tx_used（= 客户端下载）
+        new_tx = max(0, tx_used + delta)
+        await db.execute("UPDATE traffic SET tx_used = ? WHERE id = 1", (new_tx,))
         await db.commit()
 
     return await snapshot()
