@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from .auth import get_current_user
 from ..models.database import get_db
 from ..services.singbox import SingboxService, CONTAINER_NAME
-from ..services import protocols, traffic
+from ..services import official, protocols, traffic
 from ..services.updater import SingboxUpdater
 
 router = APIRouter()
@@ -93,6 +93,55 @@ async def sync_traffic(req: TrafficSyncRequest, user: dict = Depends(get_current
     if req.used_gb < 0:
         raise HTTPException(status_code=400, detail="已用流量不能为负")
     return await traffic.align_used(req.used_gb)
+
+
+class OfficialConfig(BaseModel):
+    enabled: bool | None = None
+    username: str | None = None
+    password: str | None = None
+    product_id: str | None = None
+    interval_min: int | None = None
+
+
+class OfficialSyncRequest(BaseModel):
+    # 传了就先用这组凭据试一次，成功才保存（便于"测试连接"）
+    username: str | None = None
+    password: str | None = None
+    product_id: str | None = None
+    save: bool = False
+
+
+@router.get("/official/status")
+async def official_status(user: dict = Depends(get_current_user)):
+    """官方数据源状态（不含密码）"""
+    return await official.get_status()
+
+
+@router.put("/official/config")
+async def official_config(req: OfficialConfig, user: dict = Depends(get_current_user)):
+    """保存官方数据源配置；password 为空表示不修改"""
+    if req.interval_min is not None and req.interval_min < 0:
+        raise HTTPException(status_code=400, detail="同步间隔不能为负")
+    return await official.save_config(req.dict(exclude_none=True))
+
+
+@router.post("/official/sync")
+async def official_sync(req: OfficialSyncRequest, user: dict = Depends(get_current_user)):
+    """立即抓一次。带凭据则先用这组试，成功后可顺便保存"""
+    creds = None
+    if req.username and req.password and req.product_id:
+        creds = {
+            "username": req.username,
+            "password": req.password,
+            "product_id": req.product_id,
+        }
+    result = await official.sync_once(force=True, creds=creds)
+    if result.get("ok") and creds and req.save:
+        await official.save_config({**creds, "enabled": True})
+        result["saved"] = True
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("message") or "同步失败")
+    return result
 
 
 @router.get("/stats")

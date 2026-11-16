@@ -1,4 +1,5 @@
 """sing-box 管理面板 - FastAPI 主入口（纯 JSON API + SPA 托管）"""
+import asyncio
 import os
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .models.database import init_db
 from .routers import auth, nodes, subscription, api
+from .services import official
 
 DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
 CONFIG_DIR = DATA_DIR / "config"
@@ -29,6 +31,8 @@ app.include_router(api.router, prefix="/api", tags=["API"])
 @app.on_event("startup")
 async def startup():
     await init_db()
+    # 官方流量数据源：定时抓服务商控制台的已用流量（未启用时该协程空转）
+    asyncio.create_task(official.sync_loop())
 
 
 @app.get("/health")
