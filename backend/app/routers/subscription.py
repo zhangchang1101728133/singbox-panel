@@ -109,13 +109,18 @@ async def download_subscription(name: str):
     """下载订阅配置 - 支持 token 或 slug 访问（未认证，靠不可枚举的 token 鉴权）"""
     async with get_db() as db:
         cursor = await db.execute(
-            "SELECT id, enabled FROM subscriptions WHERE slug = ? OR token = ?", (name, name)
+            "SELECT id, enabled, token FROM subscriptions WHERE slug = ? OR token = ?", (name, name)
         )
         sub = await cursor.fetchone()
         if not sub or not sub["enabled"]:
             raise HTTPException(status_code=404, detail="订阅不存在")
 
     sub_path = _sub_file(sub["id"])
+    if not sub_path.exists():
+        # compatible: early versions named file by token (sub_<token>.json)
+        legacy = SingboxService.SUB_DIR / f"sub_{sub['token']}.json"
+        if legacy.exists():
+            sub_path = legacy
     if not sub_path.exists():
         raise HTTPException(status_code=404, detail="订阅文件不存在")
     with open(sub_path, "r", encoding="utf-8") as f:

@@ -198,7 +198,7 @@ async def quick_setup(req: QuickSetupRequest, user: dict = Depends(get_current_u
                 node["config"] = json.loads(node["config"])
 
         client_config = SingboxService.generate_client_config(nodes)
-        SingboxService.save_subscription(client_config, sub_token)
+        SingboxService.save_subscription(client_config, sub_id)
 
         # 生成服务端配置并重启
         server_config = SingboxService.generate_server_config(nodes)
