@@ -90,19 +90,6 @@ export interface ServerInfo {
   base_url: string
 }
 
-/** GET /api/official/status —— 官方流量数据源状态（不含密码） */
-export interface OfficialStatus {
-  enabled: boolean
-  username: string
-  has_password: boolean
-  product_id: string
-  interval_min: number
-  last_sync: string
-  last_used: string
-  last_total: string
-  last_error: string
-}
-
 /** GET /api/traffic —— 本计费周期流量用量 */
 export interface TrafficInfo {
   upload: number

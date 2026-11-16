@@ -2,10 +2,10 @@
 import { ref, computed } from 'vue'
 import {
   useMessage, NModal, NForm, NFormItem, NInput, NInputNumber,
-  NButton, NSpace, NText, NAlert, NSwitch, NDivider,
+  NButton, NSpace, NText, NAlert,
 } from 'naive-ui'
 import { api, errMsg } from '../api/client'
-import type { TrafficInfo, OfficialStatus } from '../types/index'
+import type { TrafficInfo } from '../types/index'
 
 const emit = defineEmits(['refresh'])
 const message = useMessage()
@@ -19,15 +19,6 @@ const totalGb = ref<number | null>(null)
 const resetDay = ref<number | null>(null)
 const resetTime = ref('10:31')
 const alignGb = ref<number | null>(null)
-
-// ── 官方数据源 ──
-const official = ref<OfficialStatus | null>(null)
-const oEnabled = ref(false)
-const oUsername = ref('')
-const oPassword = ref('')
-const oProductId = ref('')
-const oInterval = ref<number | null>(30)
-const oTesting = ref(false)
 
 const GiB = 1024 ** 3
 const toGb = (bytes: number) => bytes / GiB
@@ -49,65 +40,14 @@ const periodText = computed(() => {
 
 async function load() {
   try {
-    const [d, st] = await Promise.all([
-      api.get<TrafficInfo>('/api/traffic'),
-      api.get<OfficialStatus>('/api/official/status'),
-    ])
+    const d = await api.get<TrafficInfo>('/api/traffic')
     info.value = d
     totalGb.value = d.total_gb
     resetDay.value = d.reset_day
     resetTime.value = d.reset_time
     alignGb.value = Number(toGb(d.upload + d.download).toFixed(2))
-
-    official.value = st
-    oEnabled.value = st.enabled
-    oUsername.value = st.username
-    oProductId.value = st.product_id
-    oInterval.value = st.interval_min
-    oPassword.value = ''
   } catch (e) {
     message.error(errMsg(e))
-  }
-}
-
-async function saveOfficial(showToast = true) {
-  await api.put<OfficialStatus>('/api/official/config', {
-    enabled: oEnabled.value,
-    username: oUsername.value || undefined,
-    password: oPassword.value || undefined,
-    product_id: oProductId.value || undefined,
-    interval_min: oInterval.value ?? 30,
-  })
-  oPassword.value = ''
-  official.value = await api.get<OfficialStatus>('/api/official/status')
-  if (showToast) message.success('官方数据源已保存')
-}
-
-async function testOfficial() {
-  if (!oUsername.value && !official.value?.has_password) {
-    message.warning('请先填写账号')
-    return
-  }
-  if (!oPassword.value && !official.value?.has_password) {
-    message.warning('请先填写密码')
-    return
-  }
-  oTesting.value = true
-  try {
-    await api.post<unknown>('/api/official/sync', {
-      username: oUsername.value || undefined,
-      password: oPassword.value || undefined,
-      product_id: oProductId.value || undefined,
-      save: true,
-    })
-    message.success('抓取成功，已按官方数据更新')
-    oPassword.value = ''
-    await load()
-    emit('refresh')
-  } catch (e) {
-    message.error(errMsg(e), { duration: 8000 })
-  } finally {
-    oTesting.value = false
   }
 }
 
@@ -158,7 +98,7 @@ defineExpose({ open })
 </script>
 
 <template>
-  <n-modal v-model:show="show" preset="card" title="流量设置" style="max-width: 500px" :auto-focus="false">
+  <n-modal v-model:show="show" preset="card" title="流量设置" style="max-width: 450px" :auto-focus="false">
     <n-space vertical :size="14">
       <n-alert type="info" :bordered="false">
         <n-space vertical :size="2">
@@ -201,54 +141,6 @@ defineExpose({ open })
           </n-space>
         </n-form-item>
       </n-form>
-
-      <n-divider style="margin: 4px 0 10px">官方数据源</n-divider>
-
-      <n-space vertical :size="10">
-        <n-space align="center" :size="8">
-          <n-switch v-model:value="oEnabled" size="small" />
-          <n-text style="font-size: 13px">定时抓取服务商控制台的已用流量（覆盖本地估算）</n-text>
-        </n-space>
-
-        <n-form label-placement="left" label-width="88" :show-feedback="false">
-          <n-form-item label="账号">
-            <n-input v-model:value="oUsername" placeholder="野草云登录邮箱" />
-          </n-form-item>
-          <n-form-item label="密码" style="margin-top: 10px">
-            <n-input
-              v-model:value="oPassword"
-              type="password"
-              show-password-on="click"
-              :placeholder="official?.has_password ? '已保存，留空表示不修改' : '登录密码'"
-            />
-          </n-form-item>
-          <n-form-item label="产品 ID" style="margin-top: 10px">
-            <n-input v-model:value="oProductId" placeholder="如 92421" style="width: 140px" />
-            <n-text depth="3" style="font-size: 12px; margin-left: 8px">控制台地址里的 id</n-text>
-          </n-form-item>
-          <n-form-item label="同步间隔" style="margin-top: 10px">
-            <n-input-number v-model:value="oInterval" :min="0" :step="5" style="width: 110px" />
-            <n-text depth="3" style="font-size: 12px; margin-left: 8px">分钟，0 = 只在手动触发时抓</n-text>
-          </n-form-item>
-        </n-form>
-
-        <n-space align="center" :size="8">
-          <n-button size="small" type="primary" ghost :loading="oTesting" @click="testOfficial">
-            测试并保存
-          </n-button>
-          <n-button size="small" @click="saveOfficial()">仅保存配置</n-button>
-        </n-space>
-
-        <n-text v-if="official?.last_sync" depth="3" style="font-size: 12px">
-          上次同步：{{ official.last_sync.replace('T', ' ').slice(0, 19) }}
-          <template v-if="official.last_used">
-            · 官网已用 {{ (Number(official.last_used) / 1024 ** 3).toFixed(2) }} GB
-          </template>
-        </n-text>
-        <n-alert v-if="official?.last_error" type="warning" :bordered="false" style="font-size: 12px">
-          {{ official.last_error }}
-        </n-alert>
-      </n-space>
 
       <n-text depth="3" style="font-size: 12px">
         修改重置周期会重新计算周期起点，可能触发一次计数清零。
