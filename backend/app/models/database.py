@@ -63,6 +63,17 @@ async def init_db():
             )
         """)
 
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS traffic (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                period_start TEXT,
+                rx_base INTEGER DEFAULT 0,
+                tx_base INTEGER DEFAULT 0,
+                rx_used INTEGER DEFAULT 0,
+                tx_used INTEGER DEFAULT 0
+            )
+        """)
+
         # 如果表已存在但没有 slug 字段，添加它
         try:
             await db.execute("SELECT slug FROM subscriptions LIMIT 1")

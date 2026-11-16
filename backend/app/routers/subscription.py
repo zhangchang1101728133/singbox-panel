@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 
 from .auth import get_current_user
 from ..models.database import get_db
+from ..services import traffic
 from ..services.singbox import SingboxService
 
 router = APIRouter()
@@ -125,7 +126,17 @@ async def download_subscription(name: str):
         raise HTTPException(status_code=404, detail="订阅文件不存在")
     with open(sub_path, "r", encoding="utf-8") as f:
         config = json.load(f)
-    return JSONResponse(content=config)
+
+    resp = JSONResponse(content=config)
+    # 客户端（v2rayN / Clash Verge / Shadowrocket / NekoBox 等）靠这个头显示流量条
+    snap = await traffic.snapshot()
+    if snap["total"] > 0:
+        resp.headers["subscription-userinfo"] = (
+            f"upload={snap['upload']}; download={snap['download']}; "
+            f"total={snap['total']}; expire={snap['expire']}"
+        )
+    resp.headers["profile-update-interval"] = "6"
+    return resp
 
 
 async def _generate_sub_file(db, sub_id: int, node_ids: List[int]):

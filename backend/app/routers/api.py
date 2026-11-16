@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from .auth import get_current_user
 from ..models.database import get_db
 from ..services.singbox import SingboxService, CONTAINER_NAME
-from ..services import protocols
+from ..services import protocols, traffic
 from ..services.updater import SingboxUpdater
 
 router = APIRouter()
@@ -52,6 +52,12 @@ async def server_info(user: dict = Depends(get_current_user)):
         "server_ip": SingboxService.get_server_ip(),
         "base_url": SingboxService.get_public_base_url(),
     }
+
+
+@router.get("/traffic")
+async def traffic_info(user: dict = Depends(get_current_user)):
+    """本计费周期的流量用量（订阅的 subscription-userinfo 头用同一份数据）"""
+    return await traffic.snapshot()
 
 
 @router.get("/stats")

@@ -52,5 +52,9 @@ services:
       - HOST_DATA_DIR=${PROJECT_DIR:?请在 .env 中设置 PROJECT_DIR 为项目绝对路径}/data
       # 面板对外访问地址：订阅链接用它拼，避免跟着浏览器地址变成 http://IP:8080
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
+      # 套餐流量：总量(GB)、计费周期重置日、重置时刻（服务商时区 UTC+8）
+      - QUOTA_TOTAL_GB=${QUOTA_TOTAL_GB:-0}
+      - QUOTA_RESET_DAY=${QUOTA_RESET_DAY:-15}
+      - QUOTA_RESET_TIME=${QUOTA_RESET_TIME:-10:31}
     depends_on:
       - sing-box
