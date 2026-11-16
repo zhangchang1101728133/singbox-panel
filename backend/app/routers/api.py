@@ -54,10 +54,45 @@ async def server_info(user: dict = Depends(get_current_user)):
     }
 
 
+class TrafficSettings(BaseModel):
+    total_gb: float | None = None
+    reset_day: int | None = None
+    reset_time: str | None = None
+
+
+class TrafficSyncRequest(BaseModel):
+    used_gb: float
+
+
 @router.get("/traffic")
 async def traffic_info(user: dict = Depends(get_current_user)):
     """本计费周期的流量用量（订阅的 subscription-userinfo 头用同一份数据）"""
     return await traffic.snapshot()
+
+
+@router.put("/traffic/settings")
+async def update_traffic_settings(req: TrafficSettings, user: dict = Depends(get_current_user)):
+    """保存套餐总量 / 重置周期，写入 settings 表（优先于环境变量）"""
+    if req.total_gb is not None and req.total_gb < 0:
+        raise HTTPException(status_code=400, detail="套餐总量不能为负")
+    if req.reset_day is not None and not 1 <= req.reset_day <= 28:
+        raise HTTPException(status_code=400, detail="重置日需在 1-28 之间")
+    if req.reset_time is not None:
+        try:
+            hh, mm = req.reset_time.split(":")
+            if not (0 <= int(hh) < 24 and 0 <= int(mm) < 60):
+                raise ValueError
+        except (ValueError, AttributeError):
+            raise HTTPException(status_code=400, detail="重置时刻格式应为 HH:MM")
+    return await traffic.save_config(req.dict(exclude_none=True))
+
+
+@router.post("/traffic/sync")
+async def sync_traffic(req: TrafficSyncRequest, user: dict = Depends(get_current_user)):
+    """把本周期已用量对齐到服务商控制台显示的值"""
+    if req.used_gb < 0:
+        raise HTTPException(status_code=400, detail="已用流量不能为负")
+    return await traffic.align_used(req.used_gb)
 
 
 @router.get("/stats")

@@ -90,6 +90,20 @@ export interface ServerInfo {
   base_url: string
 }
 
+/** GET /api/traffic —— 本计费周期流量用量 */
+export interface TrafficInfo {
+  upload: number
+  download: number
+  total: number
+  expire: number
+  period_start: string
+  period_end: string
+  iface: string
+  total_gb: number
+  reset_day: number
+  reset_time: string
+}
+
 export interface MessageResponse {
   message: string
 }

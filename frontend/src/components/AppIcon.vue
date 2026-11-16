@@ -18,6 +18,7 @@ const PATHS = {
   refresh: 'M4 12a8 8 0 0 1 14-5l2 2M20 12a8 8 0 0 1-14 5l-2-2M18 4v5h-5M6 20v-5h5',
   power: 'M12 4v8M8 6a7 7 0 1 0 8 0',
   chevron: 'M6 9l6 6 6-6',
+  chart: 'M3 21h18M6 21V11M11 21V6M16 21v-8M21 21V9',
 } as const
 
 /** 图标名由 PATHS 的键推导，写错名字会在类型检查阶段就报错 */

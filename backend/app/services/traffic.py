@@ -3,6 +3,9 @@
 数据源是 /proc/net/dev —— 面板容器用 host 网络，读到的就是宿主机网卡。
 网卡累计值会随重启归零，所以这里把每次读到的增量累加进数据库，
 并用 period_start 区分计费周期，避免重启和跨周期算错。
+
+套餐参数（总量、重置日/时刻）优先读数据库 settings 表，面板里可以改；
+没设置时回退环境变量，再回退默认值。
 """
 
 import os
@@ -13,30 +16,60 @@ from ..models.database import get_db
 # 计费周期按服务商所在时区算（服务商给的重置时间是 UTC+8）
 TZ = timezone(timedelta(hours=8))
 
+# 面板字段 -> settings 表的 key
+SETTING_KEYS = {
+    "total_gb": "quota_total_gb",
+    "reset_day": "quota_reset_day",
+    "reset_time": "quota_reset_time",
+}
 
-def _reset_day() -> int:
+
+def _parse_reset_time(raw) -> tuple:
     try:
-        return int(os.getenv("QUOTA_RESET_DAY", "15"))
-    except ValueError:
-        return 15
-
-
-def _reset_time() -> tuple:
-    raw = os.getenv("QUOTA_RESET_TIME", "10:31")
-    try:
-        hh, mm = raw.split(":")
-        return int(hh), int(mm)
+        hh, mm = str(raw).split(":")
+        hh, mm = int(hh), int(mm)
+        if 0 <= hh < 24 and 0 <= mm < 60:
+            return hh, mm
     except (ValueError, AttributeError):
-        return 10, 31
+        pass
+    return 10, 31
 
 
-def total_bytes() -> int:
-    """套餐总量（字节）；QUOTA_TOTAL_GB=0 表示不限，订阅里就不带 total"""
+async def load_config(db) -> dict:
+    """读套餐配置：数据库优先，没配过就用环境变量"""
+    cursor = await db.execute(
+        "SELECT key, value FROM settings WHERE key IN (?, ?, ?)",
+        tuple(SETTING_KEYS.values()),
+    )
+    kv = {row["key"]: row["value"] for row in await cursor.fetchall()}
+
+    raw_total = kv.get("quota_total_gb")
+    if raw_total is None:
+        raw_total = os.getenv("QUOTA_TOTAL_GB", "0")
     try:
-        gb = float(os.getenv("QUOTA_TOTAL_GB", "0") or 0)
-    except ValueError:
+        total_gb = float(raw_total)
+    except (TypeError, ValueError):
+        total_gb = 0.0
+
+    raw_day = kv.get("quota_reset_day")
+    if raw_day is None:
+        raw_day = os.getenv("QUOTA_RESET_DAY", "15")
+    try:
+        reset_day = int(float(raw_day))
+    except (TypeError, ValueError):
+        reset_day = 15
+
+    reset_time = kv.get("quota_reset_time") or os.getenv("QUOTA_RESET_TIME", "10:31")
+
+    return {"total_gb": total_gb, "reset_day": reset_day, "reset_time": reset_time}
+
+
+def total_bytes(cfg: dict) -> int:
+    """套餐总量（字节）；0 表示不限，订阅里就不带 total"""
+    try:
+        return int(float(cfg.get("total_gb") or 0) * 1024 ** 3)
+    except (TypeError, ValueError):
         return 0
-    return int(gb * 1024 ** 3)
 
 
 def primary_iface() -> str:
@@ -70,10 +103,10 @@ def _read_counters():
     return None
 
 
-def _period_start(now: datetime) -> datetime:
+def _period_start(now: datetime, cfg: dict) -> datetime:
     """本计费周期的起点"""
-    day = _reset_day()
-    hh, mm = _reset_time()
+    day = max(1, min(28, int(cfg.get("reset_day") or 15)))
+    hh, mm = _parse_reset_time(cfg.get("reset_time"))
 
     def build(base: datetime) -> datetime:
         try:
@@ -103,10 +136,12 @@ def _next_period_start(start: datetime) -> datetime:
 async def snapshot() -> dict:
     """本周期用量快照：upload/download/total/expire 可直接喂给 subscription-userinfo"""
     now = datetime.now(TZ)
-    cur_start = _period_start(now)
     counters = _read_counters()
 
     async with get_db() as db:
+        cfg = await load_config(db)
+        cur_start = _period_start(now, cfg)
+
         cursor = await db.execute("SELECT * FROM traffic WHERE id = 1")
         row = await cursor.fetchone()
 
@@ -150,9 +185,46 @@ async def snapshot() -> dict:
     return {
         "upload": tx_used,
         "download": rx_used,
-        "total": total_bytes(),
+        "total": total_bytes(cfg),
         "expire": int(nxt.timestamp()),
         "period_start": cur_start.isoformat(),
         "period_end": nxt.isoformat(),
         "iface": primary_iface(),
+        "total_gb": cfg["total_gb"],
+        "reset_day": cfg["reset_day"],
+        "reset_time": cfg["reset_time"],
     }
+
+
+async def save_config(values: dict) -> dict:
+    """保存套餐参数（只认 SETTING_KEYS 里的字段）"""
+    async with get_db() as db:
+        for field, col in SETTING_KEYS.items():
+            value = values.get(field)
+            if value is None:
+                continue
+            await db.execute(
+                "INSERT INTO settings (key, value) VALUES (?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (col, str(value)),
+            )
+        await db.commit()
+    return await snapshot()
+
+
+async def align_used(used_gb: float) -> dict:
+    """把本周期已用量对齐到服务商控制台显示的值（差额记到下行）"""
+    target = int(round(float(used_gb) * 1024 ** 3))
+    await snapshot()  # 确保 traffic 行存在
+
+    async with get_db() as db:
+        cursor = await db.execute("SELECT rx_used, tx_used FROM traffic WHERE id = 1")
+        row = await cursor.fetchone()
+        rx_used = (row["rx_used"] or 0) if row else 0
+        tx_used = (row["tx_used"] or 0) if row else 0
+        delta = target - (rx_used + tx_used)
+        new_rx = max(0, rx_used + delta)
+        await db.execute("UPDATE traffic SET rx_used = ? WHERE id = 1", (new_rx,))
+        await db.commit()
+
+    return await snapshot()

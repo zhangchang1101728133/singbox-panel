@@ -6,6 +6,7 @@ import {
 } from 'naive-ui'
 import { api, errMsg } from '../api/client'
 import AppIcon from './AppIcon.vue'
+import TrafficModal from './TrafficModal.vue'
 import type { MessageResponse, ProtocolsResponse, Protocol, SingboxVersion, UpdateResponse } from '../types/index'
 
 const props = defineProps({
@@ -15,6 +16,8 @@ const props = defineProps({
 const emit = defineEmits(['refresh'])
 const message = useMessage()
 const dialog = useDialog()
+
+const trafficRef = ref<InstanceType<typeof TrafficModal> | null>(null)
 
 const protocols = ref<Protocol[]>([])
 const coreVersion = ref<string | null>(null)
@@ -173,6 +176,10 @@ onMounted(loadProtocols)
         <template #icon><app-icon name="refresh" :size="17" /></template>
         检查更新
       </n-button>
+      <n-button @click="trafficRef?.open()">
+        <template #icon><app-icon name="chart" :size="17" /></template>
+        流量设置
+      </n-button>
       <n-button type="error" ghost @click="confirmClear">
         <template #icon><app-icon name="trash" :size="17" /></template>
         清空配置
@@ -216,6 +223,9 @@ onMounted(loadProtocols)
       </template>
     </n-modal>
 
+    <!-- 流量设置弹窗 -->
+    <traffic-modal ref="trafficRef" @refresh="emit('refresh')" />
+
     <!-- 检查更新弹窗 -->
     <n-modal v-model:show="updateShow" preset="card" title="检查更新" style="max-width: 420px" :auto-focus="false">
       <n-text>{{ updateInfo }}</n-text>
@@ -241,7 +251,7 @@ onMounted(loadProtocols)
 .qa-grid :deep(.n-button) { width: 100%; }
 /* 宽屏：四个按钮一行平铺 */
 @media (min-width: 600px) {
-  .qa-grid { grid-template-columns: repeat(4, 1fr); }
+  .qa-grid { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
 }
 .update-log {
   margin: 10px 0 0;

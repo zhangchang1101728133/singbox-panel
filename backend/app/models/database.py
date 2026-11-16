@@ -74,6 +74,13 @@ async def init_db():
             )
         """)
 
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )
+        """)
+
         # 如果表已存在但没有 slug 字段，添加它
         try:
             await db.execute("SELECT slug FROM subscriptions LIMIT 1")
