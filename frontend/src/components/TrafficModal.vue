@@ -67,6 +67,7 @@ async function saveSettings() {
     info.value = d
     message.success('设置已保存')
     emit('refresh')
+    show.value = false
   } catch (e) {
     message.error(errMsg(e))
   } finally {
